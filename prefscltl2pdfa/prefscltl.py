@@ -1,30 +1,20 @@
 """
-Module for handling PrefLTLf formulas and converting them to preference automata.
-PrefLTLf formulas enable expressing preferences over LTLf formulas.
+Module for handling PrefScLTL formulas and converting them to preference automata.
+PrefScLTL formulas enable expressing preferences over ScLTL formulas.
 
-This module utilizes the `ltlf2dfa` library to parse and process LTLf formulas
-into preference deterministic finite automata (PDFA). It also provides functions for
+This module utilizes the `spot` library to parse and process ScLTL formulas
+into deterministic finite automata (DFA). It also provides functions for
 validating and manipulating preference automata.
-
-.. note:: The module checks for the presence of the `mona` tool, which is essential
-    for translating LTLf to PDFA. If `mona` is not found, a warning message is printed
-    to inform the user. In this case, the `translate` functionality may not work properly,
-    but the remaining functions work okay.
 """
 
 import itertools
-import lark.exceptions
 import networkx as nx
 import pprint
-import subprocess
 import sympy
 import spot
 
 from loguru import logger
-# from ltlf2dfa.parser.ltlf import LTLfParser
 from tqdm import tqdm
-
-import prefscltl2pdfa.utils as utils
 from prefscltl2pdfa.semantics import *
 
 # logger.remove()
@@ -33,39 +23,39 @@ PARSER = spot.formula
 
 class PrefScLTL:
     """
-    Represents a PrefLTLf (Preference Linear Temporal Logic over Finite Traces) formula.
+    Represents a PrefScLTL (Preference Syntactically Co-safe Linear Temporal Logic) formula.
 
-    The class is used to define, parse, and serialize PrefLTLf specifications,
+    The class is used to define, parse, and serialize PrefScLTL specifications,
     as well as to translate the formulas into automata.
 
     Attributes
     ----------
     raw_spec : str
-        The raw specification of the PrefLTLf formula.
+        The raw specification of the PrefScLTL formula.
 
     atoms : set
-        Set of atomic propositions appearing in the PrefLTLf specification.
+        Set of atomic propositions appearing in the PrefScLTL specification.
 
     alphabet : list
         A list representing the alphabet for the specification, or `None` if not provided.
 
     phi : dict
-        A dictionary of LTLf formulas appearing in the PrefLTLf specification.
+        A dictionary of ScLTL formulas appearing in the PrefScLTL specification.
 
     relation : set
-        A set of triples (PREF_TYPE, LTLf, LTLf) constructed based on the given PrefLTLf specification.
+        A set of triples (PREF_TYPE, ScLTL, ScLTL) constructed based on the given PrefScLTL specification.
 
     """
     MAXIMAL_SEMANTICS = [semantics_mp_forall_exists, semantics_mp_exists_forall, semantics_mp_forall_forall]
 
     def __init__(self, spec, alphabet=None, **kwargs):
         """
-        Initializes the PrefLTLf formula.
+        Initializes the PrefScLTL formula.
 
         Parameters
         ----------
         spec : str
-            The raw specification of the PrefLTLf formula.
+            The raw specification of the PrefScLTL formula.
 
         alphabet : list, optional
             The alphabet for the specification (default is None).
@@ -87,11 +77,11 @@ class PrefScLTL:
         """
         # Class state variables (will be serialized)
         self.raw_spec = spec
-        self.atoms = set()  # Set of atomic propositions appearing in PrefLTLf specification
+        self.atoms = set()  # Set of atomic propositions appearing in PrefScLTL specification
         self.alphabet = list(alphabet) if alphabet is not None else None
-        self.phi = dict()  # Dict (indexed set) of LTLf formulas appearing in PrefLTLf specification
-        self.relation = set()  # Set of triples (PREF_TYPE, LTLf, LTLf) constructed based on given PrefLTLf spec
-        # self.dfa = list()  # List (indexed set) of LTLf formulas appearing in PrefLTLf specification
+        self.phi = dict()  # Dict (indexed set) of ScLTL formulas appearing in PrefScLTL specification
+        self.relation = set()  # Set of triples (PREF_TYPE, ScLTL, ScLTL) constructed based on given PrefScLTL spec
+        # self.dfa = list()  # List (indexed set) of ScLTL formulas appearing in PrefScLTL specification
 
         if not kwargs.get("skip_parse", False):
             self.parse(
@@ -128,12 +118,12 @@ class PrefScLTL:
 
     def serialize(self):
         """
-        Serializes the PrefLTLf formula into a JSON-compatible dictionary.
+        Serializes the PrefScLTL formula into a JSON-compatible dictionary.
 
         Returns
         -------
         dict
-            A dictionary representing the serialized PrefLTLf formula.
+            A dictionary representing the serialized PrefScLTL formula.
         """
         jsonable_dict = {
             "f_str": self.raw_spec,
@@ -148,17 +138,17 @@ class PrefScLTL:
     @classmethod
     def deserialize(cls, obj_dict):
         """
-        Creates a PrefLTLf formula from a serialized dictionary.
+        Creates a PrefScLTL formula from a serialized dictionary.
 
         Parameters
         ----------
         obj_dict : dict
-            A dictionary representing the serialized PrefLTLf formula.
+            A dictionary representing the serialized PrefScLTL formula.
 
         Returns
         -------
         PrefScLTL
-            A new instance of the PrefLTLf formula.
+            A new instance of the PrefScLTL formula.
         """
         formula = cls(spec=obj_dict["f_str"], skip_parse=True)
         formula.atoms = set(obj_dict["atoms"])
@@ -171,7 +161,7 @@ class PrefScLTL:
     @classmethod
     def from_file(cls, fpath, alphabet=None, auto_complete="minimal"):
         """
-        Reads a PrefLTLf formula from a file.
+        Reads a PrefScLTL formula from a file.
 
         Parameters
         ----------
@@ -187,14 +177,14 @@ class PrefScLTL:
         Returns
         -------
         PrefScLTL
-            A new instance of the PrefLTLf formula.
+            A new instance of the PrefScLTL formula.
         """
         with open(fpath, 'r') as f:
             return cls(f.read(), alphabet=alphabet, auto_complete=auto_complete)
 
     def parse(self, auto_complete="minimal"):
         """
-        Parses the raw PrefLTLf formula and constructs the atomic propositions, relation, and LTLf formulas.
+        Parses the raw PrefScLTL formula and constructs the atomic propositions, relation, and ScLTL formulas.
 
         Parameters
         ----------
@@ -205,7 +195,7 @@ class PrefScLTL:
         -------
         tuple
             A tuple containing
-            - phi: Dictionary of {formula-id: LTLf Formula}
+            - phi: Dictionary of {formula-id: ScLTL Formula}
             - model: Set of binary relation of form (a, b) representing a is weakly preferred to b.
             - atoms: Set of strings representing atoms.
         """
@@ -220,7 +210,7 @@ class PrefScLTL:
             )
             auto_complete = "minimal"
 
-        # Parse header. Ensure that the spec is well-formed and a PrefLTLf formula.
+        # Parse header. Ensure that the spec is well-formed and a PrefScLTL formula.
         header = self._parse_header()
 
         # Construct intermediate representation of standard spec
@@ -249,7 +239,7 @@ class PrefScLTL:
 
     def translate(self, semantics=semantics_mp_forall_exists, show_progress=False):
         """
-        Translates the PrefLTLf formula into a preference automaton under the given semantics.
+        Translates the PrefScLTL formula into a preference automaton under the given semantics.
 
         Parameters
         ----------
@@ -274,11 +264,11 @@ class PrefScLTL:
         aut.alphabet = self.alphabet
         aut.phi = self.phi
 
-        # Translate LTLf formulas in self.phi to DFAs
+        # Translate ScLTL formulas in self.phi to DFAs
         #   Remark: We skip (-1)th spec when constructing DFA since it's a completion spec (not a ScLTL formula).
         sorted_phi = sorted([i for i in self.phi.keys() if i != -1])
         aut.dfa = [utils.scltl2dfa(self.phi[i]) for i in sorted_phi]
-        assert len(aut.dfa) >= 2, f"PrefLTLf spec must have at least two LTLf formulas."
+        assert len(aut.dfa) >= 2, f"PrefScLTL spec must have at least two ScLTL formulas."
 
         # Log all DFAs
         log_message = f"Constructed DFA: { {i: self.phi[i] for i in sorted_phi} } \n"
@@ -299,11 +289,11 @@ class PrefScLTL:
 
     def _parse_header(self):
         """
-        Parses the header of the PrefLTLf specification.
+        Parses the header of the PrefScLTL specification.
 
-        The header should be in the form: `prefltlf <num_formula>`.
+        The header should be in the form: `prefscltl <num_formula>`.
 
-        :raises ValueError: If the header is not well-formed or if the formula type is not 'prefltlf'.
+        :raises ValueError: If the header is not well-formed or if the formula type is not 'prefscltl'.
         :return: A list containing the formula type and the number of formulas.
         :rtype: list
         """
@@ -325,11 +315,11 @@ class PrefScLTL:
     # noinspection PyMethodMayBeStatic
     def _parse_scltl(self, raw_spec):
         """
-        Parses the raw specification into LTLf formulas and extracts atomic propositions.
+        Parses the raw specification into ScLTL formulas and extracts atomic propositions.
 
-        :param raw_spec: List of LTLf formula strings.
+        :param raw_spec: List of ScLTL formula strings.
         :type raw_spec: list
-        :return: A tuple containing a set of atomic propositions and a list of parsed LTLf formulas.
+        :return: A tuple containing a set of atomic propositions and a list of parsed ScLTL formulas.
         :rtype: tuple(set, list)
         """
         atoms = set()
@@ -344,7 +334,7 @@ class PrefScLTL:
 
     def _parse_relation(self, raw_spec):
         """
-        Parses the relation part of the PrefLTLf specification.
+        Parses the relation part of the PrefScLTL specification.
 
         :param raw_spec: List of preference relations (e.g., '>, >=, ~, <>').
         :type raw_spec: list
@@ -385,9 +375,9 @@ class PrefScLTL:
         # First, process the non-incomparability formulas because they add elements to preorder relation.
         for pref_type, phi1, phi2 in (f for f in relation_spec if f[0] != "<>"):
             assert 0 <= phi1 <= len(
-                self.phi), f"Index of LTLf formula out of bounds. |Phi|={len(self.phi)}, phi_1={phi1}."
+                self.phi), f"Index of ScLTL formula out of bounds. |Phi|={len(self.phi)}, phi_1={phi1}."
             assert 0 <= phi2 <= len(
-                self.phi), f"Index of LTLf formula out of bounds. |Phi|={len(self.phi)}, phi_2={phi2}."
+                self.phi), f"Index of ScLTL formula out of bounds. |Phi|={len(self.phi)}, phi_2={phi2}."
 
             if pref_type == ">" or pref_type == ">=":
                 preorder.add((phi1, phi2))
@@ -399,9 +389,9 @@ class PrefScLTL:
                 # Second, process the incomparability formulas because it removes elements to preorder relation.
         for pref_type, phi1, phi2 in (f for f in relation_spec if f[0] == "<>"):
             assert 0 <= phi1 <= len(
-                self.phi), f"Index of LTLf formula out of bounds. |Phi|={len(self.phi)}, phi_1={phi1}."
+                self.phi), f"Index of ScLTL formula out of bounds. |Phi|={len(self.phi)}, phi_1={phi1}."
             assert 0 <= phi2 <= len(
-                self.phi), f"Index of LTLf formula out of bounds. |Phi|={len(self.phi)}, phi_2={phi2}."
+                self.phi), f"Index of ScLTL formula out of bounds. |Phi|={len(self.phi)}, phi_2={phi2}."
 
             if (phi1, phi2) in preorder:
                 logger.warning(f"{(phi1, phi2)} is removed from preorder.")
@@ -594,14 +584,14 @@ class PrefScLTL:
 
     def _construct_spec_ir(self):
         """
-        Constructs an intermediate representation (IR) of the PrefLTLf specification.
+        Constructs an intermediate representation (IR) of the PrefScLTL specification.
 
         The IR consists of:
-            1. LTLf formulas parsed from the specification.
+            1. ScLTL formulas parsed from the specification.
             2. The preference relation between formulas.
 
         :raises ValueError: If a formula cannot be parsed.
-        :return: A tuple containing a dictionary of LTLf formulas and a list of preference relations.
+        :return: A tuple containing a dictionary of ScLTL formulas and a list of preference relations.
         :rtype: tuple(dict, list)
         """
         # Initialize outputs
@@ -646,8 +636,8 @@ class PrefScLTL:
             r_index = int(r_index.strip())
             assert pref_type.strip() in [">", ">=", "~", "<>"], \
                 f'{pref_type.strip()} is not a valid. Valid preference operators are {[">", ">=", "~", "<>"]}.'
-            assert l_index in phi, f"Index of LTLf formula out of bounds. |Phi|={len(phi)}, l_index={l_index}."
-            assert r_index in phi, f"Index of LTLf formula out of bounds. |Phi|={len(phi)}, r_index={l_index}."
+            assert l_index in phi, f"Index of ScLTL formula out of bounds. |Phi|={len(phi)}, l_index={l_index}."
+            assert r_index in phi, f"Index of ScLTL formula out of bounds. |Phi|={len(phi)}, r_index={l_index}."
 
             if l_index in replacement:
                 l_index = replacement[l_index]
@@ -669,9 +659,9 @@ class PrefScLTL:
     # noinspection PyMethodMayBeStatic
     def _auto_complete(self, phi, spec_ir, auto_complete):
         """
-        Handles the automatic completion of a set of LTLf formulas `phi`.
+        Handles the automatic completion of a set of ScLTL formulas `phi`.
 
-        :param phi: Dictionary of LTLf formulas.
+        :param phi: Dictionary of ScLTL formulas.
         :param spec_ir: Intermediate representation of preferences.
         :param auto_complete: Specifies the auto-completion method to apply ("minimal" or "incomparable").
         :return: Tuple containing the updated `phi` and `spec_ir`.
@@ -710,9 +700,9 @@ class PrefScLTL:
     # noinspection PyMethodMayBeStatic
     def _is_lang_complete(self, phi):
         """
-        Checks if the language of a set of LTLf formulas is complete, i.e., whether it covers all possible behaviors.
+        Checks if the language of a set of ScLTL formulas is complete, i.e., whether it covers all possible behaviors.
 
-        :param phi: Dictionary of LTLf formulas.
+        :param phi: Dictionary of ScLTL formulas.
         :return: Boolean indicating whether the language is complete.
         """
         formula = " | ".join([f"({varphi})" for varphi in phi.values()])
@@ -732,7 +722,7 @@ class PrefScLTL:
         """
         Constructs a partial order based on the provided preference statements and formulas.
 
-        :param phi: Dictionary of LTLf formulas.
+        :param phi: Dictionary of ScLTL formulas.
         :param pref_stmts: List of preference statements in the form (op, l_index, r_index).
         :return: Tuple containing the updated `phi` and the constructed partial order.
         """
@@ -824,8 +814,8 @@ class PrefScLTL:
             raise ValueError(f"Inconsistent specification: {set.intersection(set_i, set_j)} common in I and J.")
 
         # # Merge any specifications with same language.
-        # equiv = self._find_equivalent_ltlf(phi)
-        # phi, model = self._process_equiv_ltlf(phi, set.union(set_p, set_i), equiv)
+        # equiv = self._find_equivalent_scltl(phi)
+        # phi, model = self._process_equiv_scltl(phi, set.union(set_p, set_i), equiv)
         # logger.debug(f"Merge language equivalent formulas:\n{phi=} \n{model=}")
 
         # Apply reflexive closure
@@ -851,9 +841,9 @@ class PrefScLTL:
     # noinspection PyMethodMayBeStatic
     def _find_equivalent_scltl(self, phi):
         """
-        Identifies equivalent LTLf formulas from the given set of formulas.
+        Identifies equivalent ScLTL formulas from the given set of formulas.
 
-        :param phi: Dictionary of LTLf formulas.
+        :param phi: Dictionary of ScLTL formulas.
         :return: A set of tuples containing pairs of equivalent formulas.
 
         .. note:: O(n^2) complexity.
@@ -861,11 +851,11 @@ class PrefScLTL:
         # Initialize output
         equiv_formulas = set()
 
-        #  Compare every formula with every other formula to identify equivalent LTLf formulas.
+        #  Compare every formula with every other formula to identify equivalent ScLTL formulas.
         indices = list(phi.keys())
         for i in range(len(indices)):
             for j in range(i + 1, len(indices)):
-                # Approach: Construct equivalence LTLf formula.
+                # Approach: Construct equivalence ScLTL formula.
                 #   Check if DFA is universally true, i.e., has a single state which is accepting.
 
                 # Equivalence formula
@@ -877,9 +867,9 @@ class PrefScLTL:
     # noinspection PyMethodMayBeStatic
     def _process_equiv_scltl(self, phi, equiv):
         """
-        Processes and merges equivalent LTLf formulas into a single representative formula.
+        Processes and merges equivalent ScLTL formulas into a single representative formula.
 
-        :param phi: Dictionary of LTLf formulas.
+        :param phi: Dictionary of ScLTL formulas.
         :param equiv: Set of tuples representing equivalent formulas.
         :return: Tuple containing the new set of formulas and a dictionary for formula replacements.
         """
@@ -911,7 +901,7 @@ class PrefScLTL:
         """
         Converts a preorder (which may contain indifferent alternatives) to a partial order by resolving indifference.
 
-        :param phi: Dictionary of LTLf formulas.
+        :param phi: Dictionary of ScLTL formulas.
         :param preorder: Set representing the preorder relations.
         :return: Tuple containing the updated `phi` and the constructed partial order.
         """

@@ -5,10 +5,10 @@ from loguru import logger
 
 
 def scltl2dfa(formula):
-    # Use LTLf2DFA to convert LTLf formula to DFA.
+    # Use spot to convert ScLTL formula to DFA.
     aut = spot.translate(formula, "BA", "High", "SBAcc", "Complete")
     bdd_dict = aut.get_dict()
-    # logger.info(f"{ltlf_formula=}, dot={dot}")
+    # logger.info(f"{scltl_formula=}, dot={dot}")
 
     # Construct DFA dictionary using networkx MultiDiGraph.
     dfa = dict()
@@ -31,7 +31,7 @@ def scltl2dfa(formula):
             if edge.acc.count() > 0:
                 dfa["final_states"].add(int(edge.src))
 
-    logger.debug(f"ltlf_formula={formula}, dfa={dfa}")
+    logger.debug(f"scltl_formula={formula}, dfa={dfa}")
     return dfa
 
 
@@ -49,7 +49,7 @@ def maximal_outcomes(relation, outcomes):
 
 def vectorize(dfa, outcomes):
     """
-    In case of ScLTLf formulas, the vector representing class has size len(dfa) + 1.
+    In case of ScLTL formulas, the vector representing class has size len(dfa) + 1.
     The additional entry corresponds to completion formula, and is set to 1 if and only if all other entries are 0.
     """
     vector = [0] * (len(dfa) + 1)

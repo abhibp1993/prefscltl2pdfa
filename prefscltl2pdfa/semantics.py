@@ -1,17 +1,18 @@
 """
 This module defines semantic evaluation functions for comparing two
-subsets of LTLf formulas given a preorder on LTLf formulas.
+subsets of ScLTL formulas given a preorder on ScLTL formulas.
 
 Functions:
     - `semantics_forall_exists`: Evaluates under "forall_exists" condition.
     - `semantics_exists_forall`: Evaluates under "exists_forall" condition.
     - `semantics_forall_forall`: Evaluates under "forall_forall" condition.
-    - `semantics_mp_forall_exists`: Evaluates under "forall_exists" condition on maximal elements of two subsets of LTLf formulas.
-    - `semantics_mp_exists_forall`: Evaluates under "exists_forall" condition on maximal elements of two subsets of LTLf formulas.
-    - `semantics_mp_forall_forall`: Evaluates under "forall_forall" condition on maximal elements of two subsets of LTLf formulas.
+    - `semantics_mp_forall_exists`: Evaluates under "forall_exists" condition on maximal elements of
+        two subsets of ScLTL formulas.
+    - `semantics_mp_exists_forall`: Evaluates under "exists_forall" condition on maximal elements of
+        two subsets of ScLTL formulas.
+    - `semantics_mp_forall_forall`: Evaluates under "forall_forall" condition on maximal elements of
+        two subsets of ScLTL formulas.
 """
-
-import prefscltl2pdfa.utils as utils
 
 
 def semantics_forall_exists(preorder, source, target):
@@ -142,7 +143,7 @@ def semantics_mp_forall_exists(preorder, source, target):
         utils.maximal_outcomes: A utility function to compute maximal outcomes.
     """
     # PATCH: the input to this function is assumed to contain only maximal elements.
-    #   (see _construct_preference_graph function in prefltlf.py)
+    #   (see _construct_preference_graph function in prefscltl.py)
     return semantics_forall_exists(preorder, source, target)
 
 
@@ -168,7 +169,7 @@ def semantics_mp_exists_forall(preorder, source, target):
         utils.maximal_outcomes: A utility function to compute maximal outcomes.
     """
     # PATCH: the input to this function is assumed to contain only maximal elements.
-    #   (see _construct_preference_graph function in prefltlf.py)
+    #   (see _construct_preference_graph function in prefscltl.py)
     return semantics_exists_forall(preorder, source, target)
 
 
@@ -194,5 +195,5 @@ def semantics_mp_forall_forall(preorder, source, target):
         utils.maximal_outcomes: A utility function to compute maximal outcomes.
     """
     # PATCH: the input to this function is assumed to contain only maximal elements.
-    #   (see _construct_preference_graph function in prefltlf.py)
+    #   (see _construct_preference_graph function in prefscltl.py)
     return semantics_forall_forall(preorder, source, target)

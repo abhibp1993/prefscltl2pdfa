@@ -1,7 +1,6 @@
 networkx
 pygraphviz
 sympy
-ltlf2dfa
 loguru
 seaborn
 lark
